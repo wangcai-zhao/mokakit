@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' island: data:; media-src 'self' island:; style-src 'self' 'unsafe-inline'">
+<title>mokakit · 内网灵动岛</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<!-- 胶囊态 -->
+<div id="pill" class="pill">
+  <span class="pill-dot" id="pillDot"></span>
+  <span class="pill-time" id="pillTime">00:00</span>
+  <span class="pill-lyric" id="pillLyric"></span>
+  <span class="pill-mem" id="pillMem"></span>
+  <span class="pill-agents" id="pillAgents" hidden></span>
+  <span class="pill-badge" id="pillBadge" hidden>0</span>
+</div>
+
+<!-- 展开面板 -->
+<div id="panel" class="panel" hidden>
+  <header class="panel-head">
+    <div class="head-left">
+      <div class="head-time" id="headTime">00:00:00</div>
+      <div class="head-date" id="headDate">--</div>
+      <div class="agent-line" id="agentLine" hidden></div>
+    </div>
+    <div class="head-right">
+      <span class="head-device" id="headDevice"></span>
+      <button class="icon-btn" id="btnCollapse" title="收起">▲</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-tab="chat">💬 聊天</button>
+    <button class="tab" data-tab="staging">📦 中转站</button>
+    <button class="tab" data-tab="notes">📝 便签</button>
+    <button class="tab" data-tab="clip">📋 剪贴板</button>
+    <button class="tab" data-tab="music"><span class="tab-note">♪</span> 音乐</button>
+    <button class="tab" data-tab="sc">🚀 快捷工具</button>
+    <button class="tab" data-tab="settings">⚙️ 设置</button>
+  </nav>
+  <div class="edge-handle" id="edgeHandle"></div>
+
+  <main class="tab-body">
+    <!-- 聊天 -->
+    <section id="tab-chat" class="tab-page active">
+      <aside class="peer-list" id="peerList"></aside>
+      <div class="chat-main">
+        <div class="chat-title" id="chatTitle">选择左侧设备开始聊天</div>
+        <div class="chat-msgs" id="chatMsgs"></div>
+        <div class="chat-input">
+          <button class="icon-btn" id="btnAttach" title="发送文件">📎</button>
+          <input type="text" id="chatInput" placeholder="输入文字，回车发送；支持粘贴 / 拖拽文件和图片">
+          <button class="icon-btn" id="btnSend" title="发送">➤</button>
+        </div>
+      </div>
+      <div class="drop-mask" id="dropMask" hidden>松开以发送文件 / 图片</div>
+    </section>
+
+    <!-- 中转站 -->
+    <section id="tab-staging" class="tab-page">
+      <div class="section-head">
+        <span>待发送（拖文件到此页可暂存）</span>
+        <div>
+          <button class="mini-btn" id="btnStagingAdd">+ 添加文件</button>
+          <button class="mini-btn" id="btnStagingSendAll">全部发送到当前设备</button>
+          <button class="mini-btn danger" id="btnStagingClear">清空</button>
+        </div>
+      </div>
+      <ul class="file-list" id="stagingList"></ul>
+      <div class="section-head">
+        <span>最近接收 / 最近文件</span>
+        <button class="mini-btn" id="btnOpenReceived">打开接收目录</button>
+      </div>
+      <ul class="file-list" id="recentList"></ul>
+    </section>
+
+    <!-- 快捷工具（快捷启动 + 时钟/番茄钟） -->
+    <section id="tab-sc" class="tab-page">
+      <div class="section-head">
+        <span>快捷启动（点击图标打开）</span>
+        <span class="head-btns">
+          <span class="hint" id="scCount">已添加 0 项</span>
+          <button class="mini-btn" id="btnScAdd">＋ 添加快捷</button>
+        </span>
+      </div>
+      <div class="sc-grid" id="scGrid"></div>
+      <div class="drop-tip">也可以直接把程序 / 文件 / 文件夹拖到本页</div>
+
+      <div class="section-head"><span>时钟</span></div>
+      <div class="clock-box small">
+        <div class="clock-big" id="bigClock">00:00:00</div>
+        <div class="clock-date" id="bigDate"></div>
+      </div>
+      <div class="pomo-box">
+        <div class="section-head"><span>番茄钟 / 计时器</span></div>
+        <div class="pomo-row">
+          <input type="number" id="pomoMin" value="25" min="1" max="180"> 分钟
+          <button class="mini-btn" id="btnPomoStart">开始</button>
+          <button class="mini-btn" id="btnPomoReset">重置</button>
+        </div>
+        <div class="pomo-time" id="pomoTime">25:00</div>
+      </div>
+    </section>
+
+    <!-- 便签 -->
+    <section id="tab-notes" class="tab-page">
+      <div class="note-input">
+        <input type="color" id="noteColor" value="#ffd166" title="新便签颜色">
+        <input type="text" id="noteInput" placeholder="写点什么，回车保存便签">
+        <button class="mini-btn" id="btnNoteAdd">添加</button>
+      </div>
+      <div class="notes-head">
+        <span class="notes-count" id="notesCount">便签</span>
+        <span class="notes-switch" id="notesSwitch">
+          <button class="sw-btn" data-layout="stack" title="层叠">⧉</button>
+          <button class="sw-btn" data-layout="grid" title="网格">⊞</button>
+          <button class="sw-btn" data-layout="list" title="列表">☰</button>
+        </span>
+      </div>
+      <div class="notes-grid" id="notesGrid"></div>
+    </section>
+
+    <!-- 剪贴板 -->
+    <section id="tab-clip" class="tab-page">
+      <div class="section-head">
+        <span>最近复制（点击重新复制）</span>
+        <button class="mini-btn danger" id="btnClipClear">清空</button>
+      </div>
+      <ul class="clip-list" id="clipList"></ul>
+    </section>
+
+    <!-- 音乐 -->
+    <section id="tab-music" class="tab-page">
+      <div class="player-box">
+        <div class="player-title" id="playerTitle">未播放</div>
+        <div class="player-lyric" id="playerLyric"></div>
+        <div class="lyric-sync" id="lyricSync" hidden>
+          <span class="sync-hint">歌词不同步：</span>
+          <button class="sync-btn" id="btnLyricEarly" title="歌词比声音快，点这里">提前 0.5s</button>
+          <button class="sync-val" id="lyricOffset" title="点击归零">+0.0s</button>
+          <button class="sync-btn" id="btnLyricLate" title="歌词比声音慢，点这里">延后 0.5s</button>
+        </div>
+        <audio id="audioEl"></audio>
+        <div class="player-progress">
+          <span id="curTime">0:00</span>
+          <input type="range" id="seekBar" value="0" min="0" max="100">
+          <span id="durTime">0:00</span>
+        </div>
+        <div class="player-btns">
+          <button class="p-btn" id="btnPrev" title="上一首" aria-label="上一首">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5v14M20 5v14L9 12z"/></svg>
+          </button>
+          <button class="p-btn play" id="btnPlay" title="播放 / 暂停" aria-label="播放">
+            <svg class="ic-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>
+            <svg class="ic-pause" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>
+          </button>
+          <button class="p-btn" id="btnNext" title="下一首" aria-label="下一首">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 5v14M4 5v14l11-7z"/></svg>
+          </button>
+          <span class="vol-wrap">
+            <svg class="vol-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9zM16 8a5 5 0 010 8"/></svg>
+            <input type="range" id="volBar" min="0" max="100" value="80">
+          </span>
+        </div>
+      </div>
+      <div class="section-head">
+        <span>播放列表</span>
+        <span class="head-btns">
+          <button class="mini-btn" id="btnAddMusicFiles">添加文件</button>
+          <button class="mini-btn" id="btnPickMusic">添加文件夹</button>
+          <button class="mini-btn danger" id="btnClearMusic">清空</button>
+        </span>
+      </div>
+      <ul class="file-list" id="musicList"></ul>
+      <div class="section-head"><span>主流平台（浏览器打开）</span></div>
+      <div class="platform-row" id="platformRow"></div>
+    </section>
+
+    <!-- 设置 -->
+    <section id="tab-settings" class="tab-page">
+      <div class="set-group"><div class="set-title">设备与网络</div>
+        <label>设备名称 <input type="text" id="setName"></label>
+        <label>传输端口 <input type="number" id="setPort"> <span class="hint">（修改后重启生效）</span></label>
+        <label>单文件上限(MB) <input type="number" id="setMaxMB" min="1"></label>
+      </div>
+      <div class="set-group"><div class="set-title">界面</div>
+        <label>主题
+          <select id="setTheme"><option value="dark">深色</option><option value="light">浅色</option></select>
+        </label>
+        <label>窗口不透明度 <input type="range" id="setOpacity" min="0.4" max="1" step="0.05"></label>
+        <label><input type="checkbox" id="setTop"> 窗口置顶</label>
+        <label><input type="checkbox" id="setAnim"> 展开/收起动画</label>
+        <label><input type="checkbox" id="setEdgeHide"> 贴边后自动收缩隐藏</label>
+        <label><input type="checkbox" id="setAutoCollapse"> 展开后鼠标离开自动收起</label>
+        <label>便签显示方式
+          <select id="setNoteLayout"><option value="grid">网格</option><option value="list">列表</option><option value="stack">层叠</option></select>
+        </label>
+      </div>
+      <div class="set-group"><div class="set-title">系统</div>
+        <label>唤起快捷键 <input type="text" id="setShortcut" placeholder="Ctrl+Shift+Space"></label>
+        <label><input type="checkbox" id="setAutoStart"> 开机自启</label>
+        <label><input type="checkbox" id="setHwAccel"> 硬件加速（重启生效）</label>
+      </div>
+      <div class="set-group"><div class="set-title">内存占用</div>
+        <label><input type="checkbox" id="setLowMem"> 低内存模式（降低轮询频率/关闭动画）</label>
+        <div class="mem-row">当前占用：<b id="memInfo">--</b>
+          <button class="mini-btn" id="btnMemRefresh">刷新</button>
+          <button class="mini-btn" id="btnMemGc">立即释放内存</button>
+        </div>
+      </div>
+      <div class="set-group">
+        <button class="mini-btn" id="btnSaveSettings">保存设置</button>
+        <button class="mini-btn danger" id="btnQuit">退出应用</button>
+        <span class="hint" id="saveTip"></span>
+      </div>
+      <div class="set-group"><div class="set-title">关于</div>
+        <div class="mem-row">mokakit <b id="aboutVer">--</b><span class="hint">内网灵动岛</span></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- 添加快捷弹窗 -->
+<div id="scModal" class="modal-mask" hidden>
+  <div class="modal-panel">
+    <div class="modal-head">
+      <span class="modal-title">添加到快捷 App</span>
+      <span class="hint" id="scModalCount">已添加 0 项</span>
+      <button class="icon-btn" id="scModalClose" title="关闭">✕</button>
+    </div>
+    <div class="sc-strip" id="scStrip"></div>
+    <div class="sc-modal-tabs" id="scModalTabs">
+      <button class="mt-btn active" data-mt="program">▦ 程序</button>
+      <button class="mt-btn" data-mt="file">🗋 文件</button>
+      <button class="mt-btn" data-mt="folder">📁 文件夹</button>
+    </div>
+    <input type="text" id="scSearch" placeholder="搜索程序，可以用拼音首字母">
+    <div class="sc-list" id="scList"></div>
+    <button class="sc-pick-btn" id="scPickBtn">列表中没？从电脑中选择程序</button>
+    <div class="sc-modal-hint" id="scPickHint">可以选择 exe 或快捷方式</div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

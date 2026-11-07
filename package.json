@@ -1,0 +1,39 @@
+{
+  "name": "mokakit",
+  "version": "1.1.0",
+  "description": "mokakit - 内网灵动岛：跨平台局域网文件/文字/图片互传",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win portable --x64"
+  },
+  "files": [
+    "main.js",
+    "preload.js",
+    "lan.js",
+    "store.js",
+    "renderer/**/*"
+  ],
+  "build": {
+    "appId": "com.mokakit.desktop",
+    "productName": "mokakit",
+    "directories": { "output": "dist" },
+    "win": {
+      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "artifactName": "mokakit-${version}-portable.exe"
+    },
+    "portable": {
+      "unpackDirName": "mokakit"
+    },
+    "nsis": {
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": false
+    }
+  },
+  "devDependencies": {
+    "electron": "^33.0.0",
+    "electron-builder": "^26.18.0"
+  }
+}
