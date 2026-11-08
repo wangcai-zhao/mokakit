@@ -714,10 +714,10 @@ function renderUpdate(s) {
     idle: '启动后自动检查',
     checking: '正在检查更新…',
     available: `发现新版本 v${s.version}`,
-    downloading: `正在下载 ${s.percent || 0}%`,
+    downloading: s.message || `正在下载 ${s.percent || 0}%`,
     downloaded: `v${s.version} 已就绪`,
     none: '已是最新版本',
-    error: '检查失败：' + (s.message || '网络错误'),
+    error: '检查失败：' + String(s.message || '网络异常').slice(0, 50),
   };
   tip.textContent = map[s.status] || '';
   if (s.status === 'available') {

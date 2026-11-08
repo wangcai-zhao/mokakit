@@ -619,11 +619,11 @@ function setupIpc() {
   ipcMain.handle('update:state', () => updateState);
   ipcMain.handle('update:check', () => {
     if (!updater) return updateState;
-    updater.checkForUpdates().catch((e) => { updateState = { status: 'error', message: String(e && e.message || e) }; });
+    updater.checkForUpdates().catch((e) => sendUpdate({ status: 'error', message: friendlyUpdateError(e) }));
     return updateState;
   });
   ipcMain.handle('update:download', () => {
-    if (updater) updater.downloadUpdate().catch(() => {});
+    if (updater) startDownload();
     return updateState;
   });
   ipcMain.handle('update:install', () => {
@@ -1072,6 +1072,33 @@ function setupProtocol() {
 // 策略：启动 10s 后自动检查一次；发现更新仅提示，用户点「下载」才下载，下载完成后可一键重启安装。
 // 测试模式（ISLAND_DATA）与开发环境（无 latest.yml）静默跳过，不干扰。
 let updater = null, updateState = { status: 'idle' };
+let downloadIntent = false, downloadRetry = 0;
+const MAX_DOWNLOAD_RETRY = 3;
+
+function sendUpdate(patch) {
+  updateState = { ...updateState, ...patch };
+  if (win && !win.isDestroyed()) win.webContents.send('update:status', updateState);
+}
+
+/** 错误信息精简：electron-updater 的 message 可能夹带整段 HTTP 响应体（如 504 的 HTML/XML），直接展示会刷屏 */
+function friendlyUpdateError(e) {
+  const raw = String((e && (e.message || e.code)) || e || '');
+  console.error('[updater]', raw); // 原始信息只留主进程日志
+  if (/ENOENT|app-update\.yml/i.test(raw)) return '更新配置缺失，请重新安装应用';
+  if (/checksum|sha512|integrity/i.test(raw)) return '更新包校验失败，请重试';
+  if (/CHANNEL_FILE_NOT_FOUND|404/i.test(raw)) return '未找到更新文件，请稍后重试';
+  if (/ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|socket hang up|network|timeout|timed out|502|503|504/i.test(raw)) return '网络连接失败，请稍后重试';
+  return '检查更新失败，请稍后重试';
+}
+
+/** 下载入口：弱网下大包容易被上游 504 掐断，error 事件里自动重试 */
+function startDownload() {
+  if (!updater) return;
+  downloadIntent = true;
+  downloadRetry = 0;
+  updater.downloadUpdate().catch(() => {});
+}
+
 function setupUpdater() {
   if (process.env.ISLAND_DATA || !app.isPackaged) return; // 测试/开发不检查
   try { updater = require('electron-updater').autoUpdater; } catch (e) { return; }
@@ -1084,17 +1111,25 @@ function setupUpdater() {
   } catch (e) {}
   updater.autoDownload = false;
   updater.autoInstallOnAppQuit = false;
-  const send = (patch) => {
-    updateState = { ...updateState, ...patch };
-    if (win && !win.isDestroyed()) win.webContents.send('update:status', updateState);
-  };
-  updater.on('checking-for-update', () => send({ status: 'checking' }));
-  updater.on('update-available', (i) => send({ status: 'available', version: i.version }));
-  updater.on('update-not-available', () => send({ status: 'none' }));
-  updater.on('download-progress', (p) => send({ status: 'downloading', percent: Math.round(p.percent) }));
-  updater.on('update-downloaded', (i) => send({ status: 'downloaded', version: i.version }));
-  updater.on('error', (e) => send({ status: 'error', message: String(e && e.message || e) }));
-  setTimeout(() => updater.checkForUpdates().catch(() => send({ status: 'idle' })), 10000);
+  updater.on('checking-for-update', () => sendUpdate({ status: 'checking', message: '' }));
+  updater.on('update-available', (i) => sendUpdate({ status: 'available', version: i.version, message: '' }));
+  updater.on('update-not-available', () => sendUpdate({ status: 'none', message: '' }));
+  updater.on('download-progress', (p) => sendUpdate({ status: 'downloading', percent: Math.round(p.percent), message: '' }));
+  updater.on('update-downloaded', (i) => {
+    downloadIntent = false; downloadRetry = 0;
+    sendUpdate({ status: 'downloaded', version: i.version, message: '' });
+  });
+  updater.on('error', (e) => {
+    const msg = friendlyUpdateError(e); // 先记原始错误日志
+    if (downloadIntent && updateState.status !== 'downloaded' && downloadRetry < MAX_DOWNLOAD_RETRY) {
+      downloadRetry++;
+      sendUpdate({ status: 'downloading', percent: updateState.percent || 0, message: `网络中断，正在重试 ${downloadRetry}/${MAX_DOWNLOAD_RETRY}` });
+      setTimeout(() => { if (downloadIntent) updater.downloadUpdate().catch(() => {}); }, 2000 * downloadRetry);
+      return;
+    }
+    sendUpdate({ status: 'error', message: msg });
+  });
+  setTimeout(() => updater.checkForUpdates().catch(() => sendUpdate({ status: 'idle' })), 10000);
 }
 
 app.whenReady().then(() => {
