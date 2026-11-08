@@ -480,7 +480,7 @@ const WB_DIR = path.join(require('os').homedir(), '.workbuddy');
 let agentTimer = null;
 let lastAgentJson = '';
 
-/** TRAE：读取最新会话事件流，running → 正在工作；事件里出现等待批准字段 → 等待批准；刚结束 → 完成 */
+/** TRAE：读取最新会话事件流。事件流在推理过程中会长时间静默，不能只按 mtime 判空闲 */
 function traeStatus() {
   try {
     if (!fs.existsSync(TRAE_EVENT_DIR)) return { state: 'idle', running: false };
@@ -500,11 +500,12 @@ function traeStatus() {
       }
     }
     if (!newest) return { state: 'idle', running: true };
-    let status = '', waiting = false;
+    let status = '', waiting = false, lastType = '';
     const lines = fs.readFileSync(newest.path, 'utf8').trim().split(/\r?\n/).slice(-60);
     for (const ln of lines) {
       try {
         const o = JSON.parse(ln);
+        if (o.type) lastType = String(o.type);
         if (/approval|permission|confirm/i.test(String(o.type || ''))) waiting = true;
         let d = o.data;
         if (typeof d === 'string') { try { d = JSON.parse(d); } catch (e) {} }
@@ -517,7 +518,10 @@ function traeStatus() {
     }
     const silent = Date.now() - newest.mtime;
     if (waiting) return { state: 'waiting', running: true };
-    if (/run|think|busy|exec|tool/i.test(status) && silent < 180000) return { state: 'working', running: true };
+    // 回合结束标记（message_context_update / context_usage）刚写入 → 视为刚完成，保留 45 秒
+    if (/message_context_update|context_usage/.test(lastType) && silent < 45000) return { state: 'done', running: true };
+    // running 是长期状态，推理静默可达数分钟，30 分钟内都算正在工作
+    if (/run|think|busy|exec|tool/i.test(status) && silent < 1800000) return { state: 'working', running: true };
     if (silent < 45000) return { state: 'done', running: true };
     return { state: 'idle', running: true };
   } catch (e) {
@@ -525,7 +529,7 @@ function traeStatus() {
   }
 }
 
-/** WorkBuddy：心跳文件判断是否运行；mcp-approvals 非空 → 等待批准；会话日志/任务/审计流水近期有写入 → 工作/完成 */
+/** WorkBuddy：心跳文件判断进程是否运行；只有「最近发生的批准请求」才算等待批准；任务/审计流水近期写入 → 工作 */
 function wbStatus() {
   try {
     if (!fs.existsSync(WB_DIR)) return { state: 'idle', running: false };
@@ -537,20 +541,31 @@ function wbStatus() {
       }
     }
     if (!alive) return { state: 'idle', running: false };
-    let last = 0;
-    const touch = (p) => { try { const t = fs.statSync(p).mtimeMs; if (t > last) last = t; } catch (e) {} };
+    const now = Date.now();
+    // mcp-approvals.json 记录的是「已发生过的批准」，只有 90 秒内的才算当前正在等待批准
     const ap = path.join(WB_DIR, 'mcp-approvals.json');
     try {
-      if (fs.existsSync(ap)) {
+      if (fs.existsSync(ap) && now - fs.statSync(ap).mtimeMs < 90000) {
         const j = JSON.parse(fs.readFileSync(ap, 'utf8'));
-        if (j && typeof j === 'object' && Object.keys(j).length) return { state: 'waiting', running: true };
-        touch(ap);
+        if (j && typeof j === 'object') {
+          for (const v of Object.values(j)) {
+            const t = typeof v === 'number' ? (v > 1e12 ? v : v * 1000) : Date.parse(v);
+            if (t && now - t < 90000) return { state: 'waiting', running: true };
+          }
+        }
       }
     } catch (e) {}
+    let last = 0;
+    const touch = (p) => { try { const t = fs.statSync(p).mtimeMs; if (t > last) last = t; } catch (e) {} };
     const d = new Date();
     const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    // operation.log / daemon 日志是常驻后台写入，不代表 Agent 在工作，必须排除
     const conv = path.join(WB_DIR, 'logs', ymd, 'sdk', 'conversations');
-    if (fs.existsSync(conv)) for (const f of fs.readdirSync(conv)) if (f.endsWith('.log')) touch(path.join(conv, f));
+    if (fs.existsSync(conv)) {
+      for (const f of fs.readdirSync(conv)) {
+        if (f.endsWith('.log') && f !== 'operation.log' && !f.includes('warning')) touch(path.join(conv, f));
+      }
+    }
     const tasks = path.join(WB_DIR, 'tasks');
     if (fs.existsSync(tasks)) {
       for (const s of fs.readdirSync(tasks)) {
@@ -561,7 +576,6 @@ function wbStatus() {
     }
     const spool = path.join(WB_DIR, 'audit-log', 'spool');
     if (fs.existsSync(spool)) for (const f of fs.readdirSync(spool)) if (f.endsWith('.jsonl')) touch(path.join(spool, f));
-    const now = Date.now();
     if (last && now - last < 12000) return { state: 'working', running: true };
     if (last && now - last < 45000) return { state: 'done', running: true };
     return { state: 'idle', running: true };
@@ -1061,6 +1075,13 @@ let updater = null, updateState = { status: 'idle' };
 function setupUpdater() {
   if (process.env.ISLAND_DATA || !app.isPackaged) return; // 测试/开发不检查
   try { updater = require('electron-updater').autoUpdater; } catch (e) { return; }
+  // 兜底：手工组装 package 时可能漏掉 app-update.yml，缺失会导致检查更新报 ENOENT
+  try {
+    const cfg = path.join(process.resourcesPath, 'app-update.yml');
+    if (!fs.existsSync(cfg)) {
+      fs.writeFileSync(cfg, 'provider: github\nowner: wangcai-zhao\nrepo: mokakit\nupdaterCacheDirName: mokakit-updater\n');
+    }
+  } catch (e) {}
   updater.autoDownload = false;
   updater.autoInstallOnAppQuit = false;
   const send = (patch) => {
