@@ -1,6 +1,6 @@
 {
   "name": "mokakit",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "description": "mokakit - 内网灵动岛：跨平台局域网文件/文字/图片互传",
   "main": "main.js",
   "author": "",
