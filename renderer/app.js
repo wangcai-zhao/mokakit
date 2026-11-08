@@ -705,7 +705,28 @@ async function loadSettings() {
   $('#setHwAccel').checked = !!s.hardwareAccel;
   $('#setLowMem').checked = !!s.lowMemoryMode;
   $('#aboutVer').textContent = 'v' + (state.version || '?');
+  refreshRecvDir();
 }
+
+// 接收目录（文件暂存路径）：显示当前路径，可改选/恢复默认/直接打开
+async function refreshRecvDir() {
+  try {
+    const p = await window.island.recvDir();
+    $('#recvDirPath').textContent = p;
+    $('#recvDirPath').title = p;
+  } catch (e) {}
+}
+$('#btnPickRecvDir').addEventListener('click', async () => {
+  await window.island.recvPickDir();
+  refreshRecvDir();
+});
+$('#btnResetRecvDir').addEventListener('click', async () => {
+  await window.island.recvResetDir();
+  refreshRecvDir();
+});
+$('#btnOpenRecvDir').addEventListener('click', async () => {
+  window.island.openPath(await window.island.recvDir());
+});
 
 // ---------- 自动更新 ----------
 function renderUpdate(s) {

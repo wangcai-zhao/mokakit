@@ -50,6 +50,7 @@ const store = new Store(path.join(userDir, 'settings.json'), {
   lowMemoryMode: false,
   hardwareAccel: true,
   autoStart: false,
+  recvDir: '',              // 接收文件目录；空 = 默认数据目录下 received
 });
 const stagingStore = new Store(path.join(userDir, 'staging.json'), { files: [] });
 const notesStore = new Store(path.join(userDir, 'notes.json'), { notes: [] });
@@ -63,7 +64,13 @@ if (lyricStore.get('ver') !== 2) {
   lyricStore.set('map', {});
   lyricStore.set('ver', 2);
 }
-const downloadDir = path.join(userDir, 'received');
+const defaultRecvDir = path.join(userDir, 'received');
+/** 接收文件目录：设置里自定义优先，未设置/无效时回落默认；取用时确保目录存在 */
+function recvDirPath() {
+  const dir = String(store.get('recvDir') || '').trim() || defaultRecvDir;
+  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) {}
+  return dir;
+}
 const clipImgDir = path.join(userDir, 'clipboard');
 const pasteTmpDir = path.join(userDir, 'paste-tmp');
 
@@ -282,7 +289,7 @@ function createTray() {
   tray.setToolTip('内网灵动岛');
   const menu = Menu.buildFromTemplate([
     { label: '展开 / 收起', click: () => setExpanded(!expanded) },
-    { label: '打开接收目录', click: () => shell.openPath(downloadDir) },
+    { label: '打开接收目录', click: () => shell.openPath(recvDirPath()) },
     { type: 'separator' },
     { label: '退出', click: () => { app.isQuitting = true; app.quit(); } },
   ]);
@@ -295,7 +302,7 @@ function startLan() {
   lan = new LanService({
     tcpPort: argvPort || store.get('tcpPort'),
     name: store.get('deviceName'),
-    downloadDir,
+    downloadDir: recvDirPath(),
     maxFileMB: store.get('maxFileMB'),
   });
   lan.on('peers', (list) => win && win.webContents.send('lan:peers', list));
@@ -762,7 +769,7 @@ function setupIpc() {
     return files;
   });
   ipcMain.handle('staging:clear', () => { stagingStore.set('files', []); return []; });
-  ipcMain.handle('staging:openReceived', () => shell.openPath(downloadDir));
+  ipcMain.handle('staging:openReceived', () => shell.openPath(recvDirPath()));
 
   // 便签
   ipcMain.handle('notes:list', () => notesStore.get('notes', []));
@@ -1015,6 +1022,24 @@ function setupIpc() {
     }
     return store.data;
   });
+  // 接收目录（文件暂存路径）：自定义后即时生效，无需重启
+  ipcMain.handle('recv:dir', () => recvDirPath());
+  ipcMain.handle('recv:pickDir', async () => {
+    modalOpen = true;
+    let r;
+    try {
+      r = await dialog.showOpenDialog(win, { title: '选择接收文件保存目录', properties: ['openDirectory', 'createDirectory'] });
+    } finally { modalOpen = false; }
+    if (r.canceled || !r.filePaths[0]) return recvDirPath();
+    store.set('recvDir', r.filePaths[0]);
+    if (lan) lan.downloadDir = r.filePaths[0];
+    return recvDirPath();
+  });
+  ipcMain.handle('recv:resetDir', () => {
+    store.set('recvDir', '');
+    if (lan) lan.downloadDir = defaultRecvDir;
+    return recvDirPath();
+  });
 
   // 内存
   ipcMain.handle('mem:info', async () => {
@@ -1058,7 +1083,7 @@ function setupProtocol() {
     const u = new URL(req.url);
     const p = decodeURIComponent(u.pathname.replace(/^\//, '')).replace(/^([a-zA-Z]):/, '$1:');
     // 仅放行接收目录、剪贴板目录与用户选择的音频
-    const ok = p.startsWith(downloadDir) || p.startsWith(clipImgDir) ||
+    const ok = p.startsWith(recvDirPath()) || p.startsWith(defaultRecvDir) || p.startsWith(clipImgDir) ||
       ['.mp3', '.flac', '.wav', '.ogg', '.m4a', '.aac', '.wma', '.png', '.jpg', '.jpeg', '.gif', '.webp', '.bmp']
         .includes(path.extname(p).toLowerCase());
     if (!ok || !fs.existsSync(p)) return new Response('forbidden', { status: 403 });

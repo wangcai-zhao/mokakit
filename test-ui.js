@@ -223,6 +223,17 @@ app.whenReady().then(async () => {
   const us = await js('window.island.updateState()');
   check('更新状态机可用', us && typeof us.status === 'string', JSON.stringify(us));
   check('设置页有检查更新按钮', await js(`!!document.querySelector('#btnUpdateCheck') && document.querySelector('#btnUpdateCheck').textContent.includes('检查更新')`) === true);
+  // 接收目录自定义
+  const recvDefault = await js('window.island.recvDir()');
+  check('接收目录默认位于数据目录', recvDefault === path.join(DATA, 'received'), recvDefault);
+  check('设置页显示接收目录路径', (await js(`document.querySelector('#recvDirPath').textContent`)).includes('received'));
+  check('接收目录按钮齐全', await js(`['btnPickRecvDir','btnResetRecvDir','btnOpenRecvDir'].every(id => !!document.getElementById(id))`) === true);
+  const customRecv = path.join(DATA, 'recv-custom');
+  await js(`window.island.settingsSet({ recvDir: ${JSON.stringify(customRecv)} })`);
+  const recvCustom = await js('window.island.recvDir()');
+  check('自定义接收目录生效并自动创建', recvCustom === customRecv && fs.existsSync(customRecv), recvCustom);
+  const recvReset = await js('window.island.recvResetDir()');
+  check('恢复默认接收目录', recvReset === path.join(DATA, 'received'), recvReset);
   await js(`(() => { const s = document.querySelector('#setOpacity'); s.value = 0.6; s.dispatchEvent(new Event('input')); })()`);
   const op1 = await js('document.body.style.opacity');
   check('滑条实时预览 body opacity=0.6', op1 === '0.6', op1);

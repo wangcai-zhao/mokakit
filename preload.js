@@ -59,6 +59,9 @@ contextBridge.exposeInMainWorld('island', {
 
   settingsGet: () => ipcRenderer.invoke('settings:get'),
   settingsSet: (patch) => ipcRenderer.invoke('settings:set', patch),
+  recvDir: () => ipcRenderer.invoke('recv:dir'),
+  recvPickDir: () => ipcRenderer.invoke('recv:pickDir'),
+  recvResetDir: () => ipcRenderer.invoke('recv:resetDir'),
 
   memInfo: () => ipcRenderer.invoke('mem:info'),
   memGc: () => ipcRenderer.invoke('mem:gc'),

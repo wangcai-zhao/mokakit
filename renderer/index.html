@@ -184,6 +184,12 @@
         <label>设备名称 <input type="text" id="setName"></label>
         <label>传输端口 <input type="number" id="setPort"> <span class="hint">（修改后重启生效）</span></label>
         <label>单文件上限(MB) <input type="number" id="setMaxMB" min="1"></label>
+        <label>接收文件保存目录 <span class="hint" id="recvDirPath">--</span></label>
+        <div class="mem-row">
+          <button class="mini-btn" id="btnPickRecvDir">选择目录</button>
+          <button class="mini-btn" id="btnResetRecvDir">恢复默认</button>
+          <button class="mini-btn" id="btnOpenRecvDir">打开目录</button>
+        </div>
       </div>
       <div class="set-group"><div class="set-title">界面</div>
         <label>主题
