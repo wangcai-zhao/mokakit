@@ -19,9 +19,18 @@
   "build": {
     "appId": "com.mokakit.desktop",
     "productName": "mokakit",
-    "directories": { "output": "dist" },
+    "directories": {
+      "output": "dist"
+    },
     "win": {
-      "target": [{ "target": "portable", "arch": ["x64"] }],
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
       "artifactName": "mokakit-${version}-portable.exe"
     },
     "portable": {
@@ -30,7 +39,11 @@
     "nsis": {
       "createDesktopShortcut": false,
       "createStartMenuShortcut": false
-    }
+    },
+    "publish": [{ "provider": "github", "owner": "wangcai-zhao", "repo": "mokakit" }]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   },
   "devDependencies": {
     "electron": "^33.0.0",

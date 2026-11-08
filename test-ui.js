@@ -220,6 +220,9 @@ app.whenReady().then(async () => {
   await js(`document.querySelector('[data-tab=settings]').click()`);
   await sleep(400);
   check('设置页显示版本号', /^v\d+\.\d+\.\d+$/.test(await js(`document.querySelector('#aboutVer').textContent`)));
+  const us = await js('window.island.updateState()');
+  check('更新状态机可用', us && typeof us.status === 'string', JSON.stringify(us));
+  check('设置页有检查更新按钮', await js(`!!document.querySelector('#btnUpdateCheck') && document.querySelector('#btnUpdateCheck').textContent.includes('检查更新')`) === true);
   await js(`(() => { const s = document.querySelector('#setOpacity'); s.value = 0.6; s.dispatchEvent(new Event('input')); })()`);
   const op1 = await js('document.body.style.opacity');
   check('滑条实时预览 body opacity=0.6', op1 === '0.6', op1);

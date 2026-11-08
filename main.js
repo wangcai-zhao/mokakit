@@ -602,6 +602,20 @@ function setupIpc() {
   ipcMain.handle('ui:setExpanded', (e, v) => setExpanded(!!v));
   // Agent 状态（测试与渲染层首次拉取）
   ipcMain.handle('agent:status', () => collectAgentStatus());
+  ipcMain.handle('update:state', () => updateState);
+  ipcMain.handle('update:check', () => {
+    if (!updater) return updateState;
+    updater.checkForUpdates().catch((e) => { updateState = { status: 'error', message: String(e && e.message || e) }; });
+    return updateState;
+  });
+  ipcMain.handle('update:download', () => {
+    if (updater) updater.downloadUpdate().catch(() => {});
+    return updateState;
+  });
+  ipcMain.handle('update:install', () => {
+    if (updater && updateState.status === 'downloaded') setImmediate(() => updater.quitAndInstall());
+    return updateState;
+  });
   // 渲染层打字活动上报：光标轮询据此豁免自动收起
   ipcMain.handle('ui:activity', () => { lastTypePing = Date.now(); });
 
@@ -1040,6 +1054,28 @@ function setupProtocol() {
 }
 
 // ---------- 生命周期 ----------
+// ---------- 自动更新（GitHub Releases） ----------
+// 策略：启动 10s 后自动检查一次；发现更新仅提示，用户点「下载」才下载，下载完成后可一键重启安装。
+// 测试模式（ISLAND_DATA）与开发环境（无 latest.yml）静默跳过，不干扰。
+let updater = null, updateState = { status: 'idle' };
+function setupUpdater() {
+  if (process.env.ISLAND_DATA || !app.isPackaged) return; // 测试/开发不检查
+  try { updater = require('electron-updater').autoUpdater; } catch (e) { return; }
+  updater.autoDownload = false;
+  updater.autoInstallOnAppQuit = false;
+  const send = (patch) => {
+    updateState = { ...updateState, ...patch };
+    if (win && !win.isDestroyed()) win.webContents.send('update:status', updateState);
+  };
+  updater.on('checking-for-update', () => send({ status: 'checking' }));
+  updater.on('update-available', (i) => send({ status: 'available', version: i.version }));
+  updater.on('update-not-available', () => send({ status: 'none' }));
+  updater.on('download-progress', (p) => send({ status: 'downloading', percent: Math.round(p.percent) }));
+  updater.on('update-downloaded', (i) => send({ status: 'downloaded', version: i.version }));
+  updater.on('error', (e) => send({ status: 'error', message: String(e && e.message || e) }));
+  setTimeout(() => updater.checkForUpdates().catch(() => send({ status: 'idle' })), 10000);
+}
+
 app.whenReady().then(() => {
   setupProtocol();
   setupIpc();
@@ -1049,6 +1085,7 @@ app.whenReady().then(() => {
   startClipboardWatch();
   startCursorWatch();
   startAgentWatch();
+  setupUpdater();
   registerShortcut(store.get('shortcut'));
 
   app.on('activate', () => { if (!win) createWindow(); });

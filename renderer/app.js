@@ -706,6 +706,34 @@ async function loadSettings() {
   $('#setLowMem').checked = !!s.lowMemoryMode;
   $('#aboutVer').textContent = 'v' + (state.version || '?');
 }
+
+// ---------- 自动更新 ----------
+function renderUpdate(s) {
+  const tip = $('#updateTip'), btn = $('#btnUpdateCheck');
+  const map = {
+    idle: '启动后自动检查',
+    checking: '正在检查更新…',
+    available: `发现新版本 v${s.version}`,
+    downloading: `正在下载 ${s.percent || 0}%`,
+    downloaded: `v${s.version} 已就绪`,
+    none: '已是最新版本',
+    error: '检查失败：' + (s.message || '网络错误'),
+  };
+  tip.textContent = map[s.status] || '';
+  if (s.status === 'available') {
+    btn.textContent = '下载更新'; btn.disabled = false;
+    btn.onclick = () => { btn.disabled = true; window.island.updateDownload(); };
+  } else if (s.status === 'downloaded') {
+    btn.textContent = '重启安装'; btn.disabled = false;
+    btn.onclick = () => window.island.updateInstall();
+  } else {
+    btn.textContent = '检查更新';
+    btn.disabled = s.status === 'checking' || s.status === 'downloading';
+    btn.onclick = () => window.island.updateCheck();
+  }
+}
+window.island.onUpdateStatus(renderUpdate);
+window.island.updateState().then(renderUpdate).catch(() => {});
 $('#btnSaveSettings').addEventListener('click', async () => {
   const patch = {
     deviceName: $('#setName').value.trim(),

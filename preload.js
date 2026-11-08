@@ -46,6 +46,10 @@ contextBridge.exposeInMainWorld('island', {
   musicLyrics: (p) => ipcRenderer.invoke('music:lyrics', p),
   musicSetOffset: (p) => ipcRenderer.invoke('music:setOffset', p),
   agentStatus: () => ipcRenderer.invoke('agent:status'),
+  updateState: () => ipcRenderer.invoke('update:state'),
+  updateCheck: () => ipcRenderer.invoke('update:check'),
+  updateDownload: () => ipcRenderer.invoke('update:download'),
+  updateInstall: () => ipcRenderer.invoke('update:install'),
   scInstalled: () => ipcRenderer.invoke('sc:installed'),
   scList: () => ipcRenderer.invoke('sc:list'),
   scAdd: (paths) => ipcRenderer.invoke('sc:add', paths),
@@ -72,5 +76,6 @@ contextBridge.exposeInMainWorld('island', {
   onExpanded: (cb) => ipcRenderer.on('ui:expanded', (e, v) => cb(v)),
   onEdgeHidden: (cb) => ipcRenderer.on('ui:edgeHidden', (e, edge) => cb(edge)),
   onAgentStatus: (cb) => ipcRenderer.on('ui:agentStatus', (e, s) => cb(s)),
+  onUpdateStatus: (cb) => ipcRenderer.on('update:status', (e, s) => cb(s)),
   onClip: (cb) => ipcRenderer.on('clip:update', (e, list) => cb(list)),
 });
